@@ -1,0 +1,22 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package CompiladoresMuerte2.Semantic;
+
+/**
+ *
+ * @authors Antonio Borrás Kostov, Xavier Matas Perelló, Xavier Palou y Gerard Medina Martorell
+ */
+public class C3DirBooleano extends C3DirOp{
+    private boolean valor;
+    
+    public C3DirBooleano(boolean v) {
+        this.valor = v;
+    }
+    
+    @Override
+    public String toString() {
+        return this.valor ? "-1":"0";
+    }
+}

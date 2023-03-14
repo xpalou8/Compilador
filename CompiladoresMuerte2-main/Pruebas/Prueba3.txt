@@ -1,0 +1,12 @@
+function bool converteixTrue(bool b){
+	b = true;
+}
+main(){
+	bool g = false;
+	g = converteixTrue(g);
+	if(g == false){
+		print("Soc false");
+	} else {
+		print("Soc true");
+	}
+}

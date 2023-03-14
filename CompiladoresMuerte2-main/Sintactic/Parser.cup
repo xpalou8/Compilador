@@ -1,0 +1,905 @@
+/**
+ Per compilar aquest fitxer s'ha d'haver instal·lat JavaCup
+
+  java -jar java-cup-11b.jar Parser.cup
+ **/
+
+/**
+ * Assignatura 21742 - Compiladors I 
+ * Estudis: Grau en Informàtica 
+ * Itinerari: Computació 
+ * Curs: 2018-2019
+ *
+ * Professor: Pere Palmer
+ */
+package CompiladoresMuerte2.Sintactic;
+
+
+
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import CompiladoresMuerte2.Sintactic.Nodo;
+import CompiladoresMuerte2.Sintactic.Tipo;
+import java_cup.runtime.ComplexSymbolFactory.ComplexSymbol;
+import java_cup.runtime.ComplexSymbolFactory.Location;
+
+class Parser;
+
+parser code {:
+    private int contador = 1;
+    private ArrayList<Nodo> EmptyNodes = new ArrayList();
+    private Nodo initnodo = new Nodo(Tipo.INICIAL, null, 0, EmptyNodes);
+    
+    /***
+    private Scanner scanner;
+    public Parser(Scanner scanner) { 
+        this.scanner = scanner;
+    }
+    ***/
+    //metodo que devuelve el nodo inicial del programa
+    public Nodo getInitNodo(){
+        return initnodo;
+    }
+
+    /**
+     * Variable utilitzada para almacenar el análisis léxico
+     **/
+    private String errores = "";
+    private int numErrores = 0;
+    /**
+     * Indicador de si s'ha detectat un error semàntic (true) o no (false);
+     * Si una regla semàntica detecta un error, el notifica i posa el valor
+     * a true, això limita el funcionament fins acabar de processar l'entrada,
+     * moment en què es torna a posar a false.
+     **/
+
+    /**********************
+     * Gestión de errores *
+     **********************/
+
+    @Override
+    public void unrecovered_syntax_error(Symbol cur_token) throws Exception {
+        report_error("Error sintàctic catastròfic \n", cur_token);
+        done_parsing();        
+    }
+    @Override
+    public void syntax_error(Symbol cur_token) {
+        report_error("Error de sintaxis en: "+cur_token.toString()+"\n", cur_token);
+    }
+    @Override
+    public void report_error(String message, Object info) {
+        StringBuilder msg = new StringBuilder("ERROR");
+        if (info instanceof Symbol) {
+            ComplexSymbol token = (ComplexSymbol)info;
+            Location l = token.getLeft();
+            
+            if (l != null) {
+                msg.append(" (fila: ")
+                   .append(l.getLine())
+                   .append(", columna: ")
+                   .append(l.getColumn())
+                   .append(")")
+                   .append("\n");
+            }
+        }
+        msg.append(": ").append(message);
+        errores += msg;
+        numErrores++;
+    }
+    @Override
+    public void report_fatal_error(String message, Object info) throws Exception {
+        report_error("Error catastròfic ("+message+")", info);
+        done_parsing();
+    }
+
+    public String get_Errores(){
+        return errores;
+    }
+    
+    public int get_errores(){
+        return numErrores;
+    }
+    
+:}
+
+
+/**
+ ** També aquí es poden afegir accions a realitzar quan es requereix un token.
+scan with {:     next_token(); :}
+**/
+
+terminal               Int, String, Bool, Const, Entero, Cadena, id;
+terminal               If, Else, Switch, Case, Default, Break, For, While;
+terminal               Main, Procedure, Function, Return, End, Print, ReadInt, ReadString;
+terminal               Suma, Resta, Igual, Mult, Div, And, Or;
+terminal               Mayor, Menor, Equal, Not_equal, Mayor_equal, Menor_equal, Increment, Decrement;
+terminal               Parentesis_a, Parentesis_c, Llave_a, Llave_c, Corchete_a, Corchete_c;
+terminal               Coma, P_coma, Dos_puntos, True, False;
+
+non terminal Nodo E, Ep, T, Tp, F, TF;
+non terminal Nodo Decl, Decl1, Asignacion, Asig2, Decl_Array;
+non terminal ArrayList<Nodo> List_ids, P_entrada, Sentencias, Sentencias1, For_Args, Cases, Lista_Param, Lista_Asignacion, ArrayIds, Acceso_array;
+non terminal Nodo Operacion, Main_program, Sentencia, Llamada_sub, condicion, condiciones, condiciones1, Cases1, Tipo;
+non terminal Nodo Salida_pantalla, FOR, ASIG, COND, ASIG2, WHILE, IF, IfOpc, ElseOpc, SWITCH, AsigFor, AsigFor2, READ;
+non terminal OpLog, OpRel, Programs;
+non terminal Nodo Subprograma, RETURN, END, Param, Program;
+
+precedence left  Suma, Resta;
+precedence left  Mult, Div;
+
+start with Programs;
+
+Decl ::= Tipo:v Decl1:v1    {:
+                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                LNodos.add(v);
+                                LNodos.add(v1);
+                                RESULT = new Nodo(Tipo.DECLARACION, null, contador++,v1left,v1right, LNodos);
+                            :}
+
+    |Const Tipo:v Asignacion:v1 {:
+                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                    LNodos.add(v);
+                                    LNodos.add(v1);
+                                    RESULT = new Nodo(Tipo.DECL_CONST, null, contador++,v1left,v1right, LNodos);
+                                :}
+;
+
+Decl1 ::= List_ids:v P_coma {:
+                                RESULT = new Nodo(Tipo.VARIABLE, null, contador++,vleft,vright, v);
+                            :}
+
+    |Decl_Array: v  {: 
+                        RESULT = v;
+                    :}
+
+    |Asignacion:v   {:
+                        RESULT = v;
+                    :}
+;
+
+Decl_Array ::=  ArrayIds:v id:v2 P_coma  {:
+                                        RESULT = new Nodo(Tipo.ARRAY, v2.toString(), contador++,v2left,v2right, v);
+                                    :}
+                
+;
+
+ArrayIds ::= ArrayIds:v Corchete_a Entero:v1 Corchete_c {:
+                                                            if(v == null){
+                                                                v = new ArrayList<>();
+                                                            }
+                                                            Nodo naux = new Nodo(Tipo.INT, v1.toString(), contador++,v1left,v1right, EmptyNodes);
+                                                            v.add(naux);
+                                                            RESULT = v;
+                                                        :}
+            |Corchete_a Entero:v Corchete_c {:
+                                                if(RESULT == null){
+                                                    RESULT = new ArrayList<>();
+                                                }
+                                                Nodo naux = new Nodo(Tipo.INT, v.toString(), contador++,vleft,vright, EmptyNodes);
+                                                RESULT.add(naux);
+                                            :}
+;
+
+Tipo ::= String {:
+                RESULT = new Nodo(Tipo.TIPO, "String", contador++, EmptyNodes);
+            :}
+
+    |Int    {:
+                RESULT = new Nodo(Tipo.TIPO, "Int", contador++, EmptyNodes);
+            :}
+
+    |Bool   {:
+                RESULT = new Nodo(Tipo.TIPO, "Bool", contador++, EmptyNodes);
+            :}
+;
+
+List_ids ::= id:v   {:
+                        if(RESULT == null){
+                            RESULT = new ArrayList<>();
+                        }
+                        Nodo naux = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                        RESULT.add(naux);
+                    :}
+
+    |List_ids:v Coma id:v1  {:
+                                if(v == null){
+                                    v = new ArrayList<>();
+                                }
+                                Nodo naux = new Nodo(Tipo.ID, (String)v1, contador++,v1left,v1right, EmptyNodes);
+                                v.add(naux);
+                                RESULT = v;
+                            :}
+;
+
+Acceso_array ::= Acceso_array:v Corchete_a Entero:v1 Corchete_c {:
+                                                                    if(v == null) {
+                                                                        v = new ArrayList<>();
+                                                                    }
+                                                                    Nodo naux = new Nodo(Tipo.INT, v1.toString(), contador++,v1left,v1right, EmptyNodes);
+                                                                    v.add(naux);
+                                                                    RESULT = v;
+                                                                :}
+                |Corchete_a Entero:v Corchete_c {:
+                                                    if(RESULT == null) {
+                                                        RESULT = new ArrayList<>();
+                                                    }
+                                                    Nodo naux = new Nodo(Tipo.INT, v.toString(), contador++,vleft,vright, EmptyNodes);
+                                                    RESULT.add(naux);
+                                                :}
+;
+
+Asignacion ::= id:v Igual Asig2:v1   {:
+                                    Nodo naux1 = new Nodo(Tipo.ID,(String)v, contador++,5,5, EmptyNodes);
+                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                    LNodos.add(naux1);
+                                    LNodos.add(v1);
+                                    RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,5,5, LNodos);
+                                :}
+    |id:v Acceso_array:v1 Igual Asig2:v2   {:
+                                                Nodo naux1 = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,vleft,vright, v1);
+                                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                LNodos.add(naux1);
+                                                LNodos.add(v2);
+                                                RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,v1left,v1right, LNodos);
+                                            :}
+    |id:v Increment P_coma  {:
+                                Nodo naux1 = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                                Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                                ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                                LNodos2.add(naux1);
+                                LNodos2.add(naux2);
+                                Nodo naux3 = new Nodo(Tipo.SUM, null, contador++, LNodos2);
+                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                LNodos.add(naux1);
+                                LNodos.add(naux3);
+                                RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                            :}
+    |id:v Acceso_array:v1 Increment P_coma  {:
+                                                Nodo naux1 = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,v1left,v1right, v1);
+                                                Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                                                ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                                                LNodos2.add(naux1);
+                                                LNodos2.add(naux2);
+                                                Nodo naux3 = new Nodo(Tipo.SUM, null, contador++, LNodos2);
+                                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                LNodos.add(naux1);
+                                                LNodos.add(naux3);
+                                                RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,v1left,v1right, LNodos);
+                                            :}
+    |id:v Decrement P_coma  {:
+                                Nodo naux1 = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                                Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                                ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                                LNodos2.add(naux2);
+                                LNodos2.add(naux1);
+                                Nodo naux3 = new Nodo(Tipo.RES, null, contador++, LNodos2);
+                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                LNodos.add(naux1);
+                                LNodos.add(naux3);
+                                RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                            :}
+    |id:v Acceso_array:v1 Decrement P_coma  {:
+                                                Nodo naux1 = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,v1left,v1right, v1);
+                                                Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                                                ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                                                LNodos2.add(naux2);
+                                                LNodos2.add(naux1);
+                                                Nodo naux3 = new Nodo(Tipo.RES, null, contador++, LNodos2);
+                                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                LNodos.add(naux1);
+                                                LNodos.add(naux3);
+                                                RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                                            :}
+;
+
+Lista_Asignacion ::=  Asignacion:v  {:
+                                        if(RESULT == null){
+                                            RESULT = new ArrayList<>();
+                                        }
+                                        RESULT.add(v);
+                                    :}
+
+    |Lista_Asignacion:v Coma Asignacion:v1      {:
+                                                    if(v == null){
+                                                        v = new ArrayList<>();
+                                                    }
+                                                    v.add(v1);
+                                                    RESULT = v;
+                                                :}                                                                          
+;
+
+Asig2 ::= READ:v Parentesis_a Parentesis_c P_coma {:
+                                                    RESULT = v;
+                                                :}
+
+    |E:v P_coma {:
+                    RESULT = v;
+                :}
+
+    |condiciones:v P_coma {:
+                            RESULT = v;
+                        :}
+
+    |Llamada_sub:v  P_coma  {:
+                                RESULT = v;
+                            :}
+;
+
+READ ::=    ReadInt:v   {: RESULT = new Nodo(Tipo.READ, "Int", contador++,vleft,vright, EmptyNodes); :}
+            |ReadString:v   {: RESULT = new Nodo(Tipo.READ, "String", contador++,vleft,vright, EmptyNodes); :}
+;
+
+Operacion ::= Lista_Asignacion:v {:
+                                RESULT = new Nodo(Tipo.LISTAASIGNACION, null, contador++,vleft,vright, v);
+                            :}
+
+    |IF:v   {:
+                RESULT = v;
+            :}
+
+    |FOR:v  {:
+                RESULT = v;
+            :}
+
+    |WHILE:v    {:
+                    RESULT = v;
+                :}
+
+    |SWITCH:v   {:
+                    RESULT = v;
+                :}
+;
+
+Main_program ::= Main Parentesis_a Parentesis_c Llave_a Sentencias:v Llave_c    {:
+                                                                                    if(v == null){
+                                                                                        RESULT = new Nodo(Tipo.MAIN, null, contador++,vleft,vright, EmptyNodes);
+                                                                                    }else{
+                                                                                        RESULT = new Nodo(Tipo.MAIN, null, contador++,vleft,vright, v);
+                                                                                    }
+                                                                                    
+                                                                                :}
+;
+
+Sentencias ::= Sentencias1:v  {: RESULT = v; :}
+    |  {: RESULT = null; :}
+;
+
+Sentencias1 ::= Sentencia:v  {:
+                                if(RESULT == null){
+                                    RESULT = new ArrayList<>();
+                                }
+                                RESULT.add(v);
+                            :}
+
+    |Sentencias1:v Sentencia:v1  {:
+                                    if(v == null){
+                                        v = new ArrayList<>();
+                                    }
+                                    v.add(v1);
+                                    RESULT = v;
+                                :}
+;
+
+Sentencia ::= Decl:v  {:
+                        RESULT = v;
+                      :}
+    |Operacion:v {:
+                    RESULT = v;
+                :}
+
+    |Llamada_sub:v P_coma   {:
+                                RESULT = v;
+                            :}
+
+    |Salida_pantalla:v  {:
+                    RESULT = v;
+                :}
+    |RETURN:v   {:
+                    RESULT = v;
+                :}
+
+;
+ 
+Llamada_sub ::= id:v Parentesis_a P_entrada:v1 Parentesis_c {:
+                                                                RESULT = new Nodo(Tipo.LLAMADA_SUB, (String)v, contador++,vleft,vright, v1);
+                                                            :}   
+;
+
+P_entrada ::= P_entrada:v Coma E:v1  {:
+                                        if(v == null){
+                                            v = new ArrayList<>();
+                                        }
+                                        v.add(v1);
+                                        RESULT = v;
+                                    :}
+            
+            |E:v    {:
+                        if(RESULT == null){
+                            RESULT = new ArrayList<>();
+                        }
+                        RESULT.add(v);
+                    :}
+
+            |   {::}
+;
+
+Salida_pantalla ::= Print Parentesis_a E:v Parentesis_c P_coma  {:
+                                                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                    LNodos.add(v);
+                                                                    RESULT = new Nodo(Tipo.SALIDA, null, contador++,vleft,vright, LNodos);
+                                                                :}
+                    |Print Parentesis_a condiciones:v Parentesis_c P_coma {:
+                                                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                            LNodos.add(v);
+                                                                            RESULT = new Nodo(Tipo.SALIDA, null, contador++,vleft,vright, LNodos);
+                                                                        :}
+
+                    |Print Parentesis_a Llamada_sub:v Parentesis_c P_coma {:
+                                                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                            LNodos.add(v);
+                                                                            RESULT = new Nodo(Tipo.SALIDA, null, contador++,vleft,vright, LNodos);
+                                                                        :}
+;
+
+FOR ::= For Parentesis_a For_Args:v Parentesis_c Llave_a Sentencias:v1 Llave_c  {:
+                                                                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                                    Nodo naux1 = new Nodo(Tipo.FORARGS, null, contador++,vleft,vright, v);
+                                                                                    LNodos.add(naux1);
+                                                                                    Nodo naux = null;
+                                                                                    if(v1 == null){
+                                                                                        naux = new Nodo(Tipo.SENTENCIAS, null, contador++,v1left,v1right, EmptyNodes);
+                                                                                    }else{
+                                                                                        naux = new Nodo(Tipo.SENTENCIAS, null, contador++,v1left,v1right, v1);
+                                                                                    }
+                                                                                    LNodos.add(naux);
+                                                                                    RESULT = new Nodo(Tipo.FOR, null, contador++,vleft,vright, LNodos);
+                                                                                :}
+                                                                                    
+;
+
+For_Args ::= ASIG:v P_coma COND:v1 P_coma ASIG2:v2  {:
+                                                        RESULT = new ArrayList<>();
+                                                        if(v != null) {
+                                                            RESULT.add(v);
+                                                        }
+                                                        if(v1 != null) {
+                                                            RESULT.add(v1);
+                                                        }
+                                                        if(v2 != null) {
+                                                            RESULT.add(v2);
+                                                        }
+                                                    :}
+;
+
+ASIG ::= Tipo:v AsigFor:v1   {:
+                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                    LNodos.add(v);
+                                    LNodos.add(v1);
+                                    RESULT = new Nodo(Tipo.DECLARACION, null, contador++,v1left,v1right, LNodos);
+                                :}
+    | {: RESULT = new Nodo(); :}
+;
+
+COND ::= condiciones:v  {: RESULT = v; :}
+    | {: RESULT = new Nodo(); :}
+;
+
+ASIG2 ::= AsigFor:v  {: RESULT = v; :}
+    | {: RESULT = new Nodo(); :}
+;
+
+AsigFor ::= id:v Igual AsigFor2:v1  {:
+                                        Nodo naux1 = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                                        LNodos.add(naux1);
+                                        LNodos.add(v1);
+
+                                        RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,v1left,v1right, LNodos);
+                                    :}
+    | id:v Acceso_array:v1 Igual AsigFor2:v2   {:
+                                                    Nodo naux1 = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,v1left,v1right, v1);
+                                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                    LNodos.add(v2);
+                                                    LNodos.add(naux1);
+                                                    RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                                                :}
+    |id:v Increment {:
+                        Nodo naux1 = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                        Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                        ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                        LNodos2.add(naux1);
+                        LNodos2.add(naux2);
+                        Nodo naux3 = new Nodo(Tipo.SUM, null, contador++, LNodos2);
+                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                        LNodos.add(naux1);
+                        LNodos.add(naux3);
+                        RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                    :}
+    |id:v Acceso_array:v1 Increment {:
+                                        Nodo naux1 = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,v1left,v1right, v1);
+                                        Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                                        ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                                        LNodos2.add(naux1);
+                                        LNodos2.add(naux2);
+                                        Nodo naux3 = new Nodo(Tipo.SUM, null, contador++, LNodos2);
+                                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                                        LNodos.add(naux1);
+                                        LNodos.add(naux3);
+                                        RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                                    :}
+    |id:v Decrement {:
+                        Nodo naux1 = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                        Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                        ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                        LNodos2.add(naux2);
+                        LNodos2.add(naux1);
+                        Nodo naux3 = new Nodo(Tipo.RES, null, contador++, LNodos2);
+                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                        LNodos.add(naux1);
+                        LNodos.add(naux3);
+                        RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                    :}
+    |id:v Acceso_array:v1 Decrement {:
+                                        Nodo naux1 = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,v1left,v1right, v1);
+                                        Nodo naux2 = new Nodo(Tipo.INT, "1", contador++, EmptyNodes);
+                                        ArrayList<Nodo> LNodos2 = new ArrayList<>();
+                                        LNodos2.add(naux2);
+                                        LNodos2.add(naux1);
+                                        Nodo naux3 = new Nodo(Tipo.RES, null, contador++, LNodos2);
+                                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                                        LNodos.add(naux1);
+                                        LNodos.add(naux3);
+                                        RESULT = new Nodo(Tipo.ASIGNACION, null, contador++,vleft,vright, LNodos);
+                                    :}
+;
+
+AsigFor2 ::= E:v    {:
+                        RESULT = v;
+                    :}
+
+    |condicion:v    {:
+                        RESULT = v;
+                    :}
+;
+
+WHILE ::= While Parentesis_a condiciones:v Parentesis_c Llave_a Sentencias:v1 Llave_c   {:
+                                                                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                                            LNodos.add(v);
+                                                                                            Nodo naux = null;
+                                                                                            if(v1 == null){
+                                                                                                naux = new Nodo(Tipo.SENTENCIAS, null, contador++,v1left,v1right, EmptyNodes);
+                                                                                            }else{
+                                                                                                naux = new Nodo(Tipo.SENTENCIAS, null, contador++,v1left,v1right, v1);
+                                                                                            }                                                            
+                                                                                            LNodos.add(naux);
+                                                                                            RESULT = new Nodo(Tipo.WHILE, null, contador++,vleft,vright, LNodos);
+                                                                                        :}
+;
+
+IF ::= If Parentesis_a condiciones:v Parentesis_c IfOpc:v1 ElseOpc:v2   {:
+                                                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                            LNodos.add(v);
+                                                                            LNodos.add(v1);
+                                                                            if(v2 != null){
+                                                                                LNodos.add(v2);
+                                                                            }
+                                                                            RESULT = new Nodo(Tipo.IF, null, contador++,vleft,vright, LNodos);
+                                                                        :}
+;
+
+IfOpc ::= Llave_a Sentencias:v Llave_c  {:
+                                            if(v != null) {
+                                                RESULT = new Nodo(Tipo.IFOPC, null, contador++,vleft,vright, v);
+                                            } else {
+                                                RESULT = new Nodo(Tipo.IFOPC, null, contador++,vleft,vright, EmptyNodes);
+                                            }
+                                            
+                                        :}    
+;
+
+ElseOpc ::= Else Llave_a Sentencias:v Llave_c   {:
+                                                    if(v == null){
+                                                        RESULT = new Nodo(Tipo.ELSE, null, contador++,vleft,vright, EmptyNodes);
+                                                    }else{
+                                                        RESULT = new Nodo(Tipo.ELSE, null, contador++,vleft,vright, v);
+                                                    }
+                                                    
+                                                :}
+    | {: RESULT = new Nodo(); :}
+;
+
+SWITCH ::= Switch Parentesis_a id:v Parentesis_c Llave_a Cases:v1 Llave_c   {:
+                                                                                RESULT = new Nodo(Tipo.SWITCH, (String)v, contador++,vleft,vright, v1);
+                                                                            :}
+;
+
+Cases ::= Cases:v Cases1:v1 {:
+                                if(v == null){
+                                    v = new ArrayList<>();
+                                }
+                                v.add(v1);
+                                RESULT = v;
+                            :}
+
+    |Cases1:v    {:
+                    if(RESULT == null){
+                        RESULT = new ArrayList<>();
+                    }
+                    RESULT.add(v);
+                 :}
+;
+
+Cases1 ::= Case F:v Dos_puntos Sentencias:v1 Break P_coma   {:
+                                                                if(v1==null){
+                                                                    RESULT = new Nodo(Tipo.CASE, v.valor(), contador++,vleft,vright, EmptyNodes);
+                                                                }else{
+                                                                    RESULT = new Nodo(Tipo.CASE, v.valor(), contador++,vleft,vright, v1);
+                                                                }
+                                                                
+                                                            :}
+
+    |Default Dos_puntos Sentencias:v    {:
+                                        if(v == null){
+                                            RESULT = new Nodo(Tipo.CASE, null, contador++,vleft,vright, EmptyNodes);
+                                        }else{
+                                            RESULT = new Nodo(Tipo.CASE, null, contador++,vleft,vright, v);
+                                        }
+                                        :}
+;
+
+condiciones ::= condiciones:v OpLog:v2 condiciones1:v1 {:
+                                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                LNodos.add(v);
+                                                LNodos.add(v1);
+                                                RESULT = new Nodo(Tipo.OPLOG, (String)v2, contador++,v2left,v2right, LNodos);
+                                            :}
+
+    |Parentesis_a condiciones:v OpLog:v2 condiciones1:v1 Parentesis_c {:
+                                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                LNodos.add(v);
+                                                LNodos.add(v1);
+                                                RESULT = new Nodo(Tipo.OPLOG, (String)v2, contador++,v2left,v2right, LNodos);
+                                            :}
+    |condiciones1:v    {: RESULT = v; :}
+;
+
+condiciones1 ::=    condicion:v    {: RESULT = v; :}
+                    |Parentesis_a condicion:v Parentesis_c  {: RESULT = v; :}
+;
+
+condicion ::= E:v OpRel:v2 E:v1    {: 
+                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                    LNodos.add(v);
+                                    LNodos.add(v1);
+                                    RESULT = new Nodo(Tipo.OPREL, (String)v2, contador++,v2left,v2right, LNodos);  
+                                :}
+    |E:v Equal TF:v1    {: 
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            LNodos.add(v);
+                            LNodos.add(v1);
+                            RESULT = new Nodo(Tipo.OPREL, "==", contador++,v1left,v1right, LNodos);    
+                        :}
+    |E:v Not_equal TF:v1    {: 
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            LNodos.add(v);
+                            LNodos.add(v1);
+                            RESULT = new Nodo(Tipo.OPREL, "!=", contador++,v1left,v1right, LNodos);    
+                        :}
+
+    |TF:v   {: RESULT = v; :}
+
+    |Llamada_sub:v Equal TF:v1  {: 
+                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                    LNodos.add(v);
+                                    LNodos.add(v1);
+                                    RESULT = new Nodo(Tipo.OPREL, "==", contador++,v1left,v1right, LNodos);    
+                                :}
+    |Llamada_sub:v Not_equal TF:v1  {: 
+                                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                                        LNodos.add(v);
+                                        LNodos.add(v1);
+                                        RESULT = new Nodo(Tipo.OPREL, "!=", contador++,v1left,v1right, LNodos);    
+                                    :}
+;
+
+TF ::= True {: RESULT = new Nodo(Tipo.BOOL, "True", contador++, EmptyNodes); :}
+
+    |False  {: RESULT = new Nodo(Tipo.BOOL, "False", contador++, EmptyNodes); :}
+;
+
+OpLog ::= And:v {: RESULT = v; :}
+    |Or:v {: RESULT = v; :}
+;
+
+OpRel ::= Equal:v {: RESULT = v; :}
+    |Not_equal:v {: RESULT = v; :}
+    |Mayor:v {: RESULT = v; :}
+    |Menor:v {: RESULT = v; :}
+    |Mayor_equal:v {: RESULT = v; :}
+    |Menor_equal:v {: RESULT = v; :}
+;
+
+Programs ::= Programs Program
+            | Program
+;
+
+Program ::= Main_program:v  {:  RESULT = v; 
+                                initnodo.addSon(v); 
+                            :}
+            | Subprograma:v {:  RESULT = v; 
+                                initnodo.addSon(v); 
+                            :}
+;
+
+Subprograma ::= Function Tipo:v id:v1 Parentesis_a Lista_Param:v2 Parentesis_c Llave_a Sentencias:v3 END:v4 Llave_c    {:
+                                                                                                                    
+                                                                                                                    Nodo naux2 = new Nodo(Tipo.ID, (String)v1, contador++,v1left,v1right, EmptyNodes);
+                                                                                                                    Nodo naux3 = new Nodo(Tipo.LISTAPARAMS, null, contador++,v2left,v2right, v2);
+                                                                                                                    Nodo naux4 = null;
+                                                                                                                    if(v3 == null){
+                                                                                                                        naux4 = new Nodo(Tipo.SENTENCIAS, null, contador++,v3left,v3right, EmptyNodes);
+                                                                                                                    }else{
+                                                                                                                        naux4 = new Nodo(Tipo.SENTENCIAS, null, contador++,v3left,v3right, v3);
+                                                                                                                    }
+                                                                                                                    naux4.addSon(v4);
+                                                                                                                    ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                                                                    LNodos.add(v);
+                                                                                                                    LNodos.add(naux2);
+                                                                                                                    LNodos.add(naux3);
+                                                                                                                    LNodos.add(naux4);
+                                                                                                                    RESULT = new Nodo(Tipo.FUNCION, null, contador++,vleft,vright, LNodos);
+                                                                                                                :}
+
+    |Procedure id:v Parentesis_a Lista_Param:v1 Parentesis_c Llave_a Sentencias:v2 Llave_c  {:
+                                                                                                Nodo naux1 = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes);
+                                                                                                Nodo naux2 = new Nodo(Tipo.LISTAPARAMS, null, contador++,v1left,v1right, v1);
+                                                                                                Nodo naux3 = null;
+                                                                                                if(v2 == null){
+                                                                                                    naux3 = new Nodo(Tipo.SENTENCIAS, null, contador++,v2left,v2right, EmptyNodes);
+                                                                                                }else{
+                                                                                                    naux3 = new Nodo(Tipo.SENTENCIAS, null, contador++,v2left,v2right, v2);
+                                                                                                }   
+                                                                                               
+                                                                                                ArrayList<Nodo> LNodos = new ArrayList<>();
+                                                                                                LNodos.add(naux1);
+                                                                                                LNodos.add(naux2);
+                                                                                                LNodos.add(naux3);
+                                                                                                RESULT = new Nodo(Tipo.PROCEDURE, null, contador++,vleft,vright, LNodos);
+                                                                                            :}
+;
+
+RETURN ::= Return condiciones:v P_coma    {:  
+                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                            LNodos.add(v);
+                                            RESULT = new Nodo(Tipo.RETURN, null, contador++,vleft,vright, LNodos);
+                                        :}
+        |Return E:v P_coma      {:  
+                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                            LNodos.add(v);
+                                            RESULT = new Nodo(Tipo.RETURN, null, contador++,vleft,vright, LNodos);
+                                        :}
+;
+
+END ::= End condiciones:v P_coma  {:  
+                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                            LNodos.add(v);
+                                            RESULT = new Nodo(Tipo.RETURN, null, contador++,vleft,vright, LNodos);
+                                        :}
+        |End E:v P_coma      {:  
+                                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                                            LNodos.add(v);
+                                            RESULT = new Nodo(Tipo.RETURN, null, contador++,vleft,vright, LNodos);
+                                        :}
+;
+
+Lista_Param ::= Param:v {: 
+                            if(RESULT == null){
+                                RESULT = new ArrayList<>();
+                            }
+                            RESULT.add(v);
+                        :}
+
+    |Lista_Param:v Coma Param:v1    {:
+                                        if(v == null) {
+                                            v = new ArrayList<>();
+                                        }
+                                        v.add(v1);
+                                        RESULT = v;
+                                    :}
+
+    |   {::}
+;
+
+Param ::= Tipo:v id:v1  {: 
+                            Nodo naux2 = new Nodo(Tipo.ID, (String)v1, contador++,v1left,v1right, EmptyNodes);
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            LNodos.add(v);
+                            LNodos.add(naux2);
+                            RESULT = new Nodo(Tipo.PARAM, null, contador++,v1left,v1right, LNodos);
+                        :}
+;
+
+E ::= T:v Ep:v1    {:  
+                        ArrayList<Nodo> LNodos = new ArrayList<>();
+                        if(v1 != null){ 
+                            v1.addSon(v);
+                            RESULT = v1;
+                        }else{
+                            RESULT = v;
+                        }      
+                    :}
+;
+
+Ep ::= Suma T:v Ep:v1  {:  
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            RESULT = new Nodo(Tipo.SUM, null, contador++, LNodos);
+                            if(v1 != null){
+                                RESULT.addSon(v1);
+                                v1.addSon(v);
+                            }else{
+                                RESULT.addSon(v);
+                            }      
+                        :}
+
+   | Resta T:v Ep:v1   {:  
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            RESULT = new Nodo(Tipo.RES, null, contador++, LNodos);
+                            if(v1 != null){
+                                RESULT.addSon(v1);
+                                v1.addSon(v);
+                            }else{
+                                RESULT.addSon(v);
+                            }         
+                        :}
+   | {: RESULT = new Nodo(); :}
+;
+
+T ::= F:v Tp:v1        {:  
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            if(v1 != null){ 
+                                v1.addSon(v);
+                                RESULT = v1;
+                            }else{
+                                RESULT = v;
+                            }
+                        :}
+;
+
+Tp ::= Mult F:v Tp:v1  {:  
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            RESULT = new Nodo(Tipo.MULT, null, contador++, LNodos);
+                            if(v1 != null){
+                                RESULT.addSon(v1);
+                                v1.addSon(v);
+                            }else{
+                                RESULT.addSon(v);
+                            }       
+                        :}
+
+    | Div F:v Tp:v1    {:  
+                            ArrayList<Nodo> LNodos = new ArrayList<>();
+                            RESULT = new Nodo(Tipo.DIV, null, contador++, LNodos);
+                            if(v1 != null){
+                                RESULT.addSon(v1);
+                                v1.addSon(v);
+                            }else{
+                                RESULT.addSon(v);
+                            }
+                        :}
+    | {: RESULT = new Nodo(); :}
+;
+
+F ::= Parentesis_a E:v Parentesis_c {: RESULT = v; :}
+
+    |Entero:v {: RESULT = new Nodo(Tipo.INT, v.toString(), contador++,vleft,vright, EmptyNodes); :}
+
+    |Cadena:v {: RESULT = new Nodo(Tipo.STRING, (String)v, contador++,vleft,vright, EmptyNodes); :}
+
+    |id:v {: RESULT = new Nodo(Tipo.ID, (String)v, contador++,vleft,vright, EmptyNodes); :}
+
+    |id:v Acceso_array:v1 {: RESULT = new Nodo(Tipo.ACCESOARRAY, (String)v, contador++,v1left,v1right, v1); :}
+
+    |Resta id:v {: RESULT = new Nodo(Tipo.ID, "-"+(String)v, contador++,vleft,vright, EmptyNodes); :}
+
+    |Resta id:v Acceso_array:v1 {: RESULT = new Nodo(Tipo.ACCESOARRAY, "-" + (String)v, contador++,v1left,v1right, v1); :}
+;

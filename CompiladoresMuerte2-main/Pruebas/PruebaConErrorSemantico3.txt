@@ -1,0 +1,4 @@
+main(){
+    const int n = 3;
+    n = 5;
+}

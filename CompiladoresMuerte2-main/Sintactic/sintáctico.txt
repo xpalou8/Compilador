@@ -1,0 +1,131 @@
+
+Decls -> Decls Decl
+    |lambda
+
+Decl -> Tipo Decl1
+    |subprograma
+    |const Tipo Asignaciones
+
+Decl1 -> List_ids P_coma
+    |Corchete_a Corchete_c List_ids P_coma
+    |Asignaciones 
+
+Tipo -> String
+    |Int
+    |Bool
+
+List_ids -> id LIDS1
+
+LIDS1 -> Coma List_ids
+    |lambda
+
+Asignaciones -> Asignacion Asignaciones1
+
+Asignaciones1 -> P_coma
+    |Coma Asignaciones 
+
+Asignacion -> id Asig1
+
+Asig1 -> Igual Asig2
+    |Corchete_a Entero Corchete_c Igual Asig2
+
+Asig2 -> Read Parentesis_a Parentesis_c P_coma
+    |E
+
+Operaciones -> Operacion
+    |Operaciones Operacion
+
+Operacion -> Asignacion
+    |IF
+    |FOR
+    |WHILE
+    |SWITCH
+
+Main_program -> Main Parentesis_a Parentesis_c Llave_a Sentencias Llave_c
+
+Sentencias ->Decls Sentencias
+    |Operaciones Sentencias
+    |Llamada_sub Sentencias
+    |Salida_pantalla Sentencias
+    |Return
+    |lambda
+ 
+Llamada_sub -> id Parentesis_a List_ids Parentesis_c P_coma   
+
+Salida_pantalla -> Print Parentesis_a E Parentesis_c P_coma
+
+FOR -> For Parentesis_a INIT P_coma COND P_coma OP Parentesis_c Llave_a Sentencias Llave_c
+
+WHILE -> While Parentesis_a condiciones Parentesis_c Llave_a Sentencias Llave_c
+
+IF -> If Parentesis_a condiciones Parentesis_c IfOpc
+
+IfOpc -> Llave_a Sentencias Llave_c  Elseop
+
+Elseop -> lambda
+    |Else Llave_a Sentencias Llave_c
+
+SWITCH -> switch Parentesis_a id Parentesis_c Llave_a cases Llave_c
+
+cases -> case F Dos_puntos Sentencias Break P_coma cases
+    |Default Dos_puntos Sentencias
+
+INIT -> Tipo Asignaciones 
+    |lambda
+
+COND -> condiciones
+    |lambda
+
+condiciones -> condicion condiciones1
+    |Parentesis_a condiciones Parentesis_c condiciones1 
+
+condiciones1 -> OpLog condiciones
+    |lambda
+
+condicion -> id OpRel id 
+    |True
+    |False
+    |id
+
+OpLog -> and
+    |or
+
+OpRel -> Equal
+    |Not_equal
+    |Mayor
+    |Menor
+    |Mayor_equal
+    |Menor_equal
+
+OP -> Asignacion
+ |lambda
+
+subprograma -> function Tipo id Parentesis_a Lista_Param Parentesis_c Llave_a Sentencias Llave_c
+    |procedure id Parentesis_a Lista_Param Parentesis_c Llave_a Sentencias Llave_c
+
+Return -> return E P_coma
+    |return condicion P_coma
+
+Lista_Param -> Param Coma Lista_Param
+    |Param 
+
+Param -> Tipo id 
+
+E -> T EP
+
+EP -> Suma T EP
+    |Resta T EP
+    |lambda
+
+T -> F TP
+
+TP -> Mult F TP
+    |Div F TP
+    |lambda
+
+F -> Parentesis_a E Parentesis_c
+    |Entero
+    |Cadena
+    |-Entero
+    |id
+    |id Corchete_a Entero Corchete_c

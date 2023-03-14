@@ -1,0 +1,12 @@
+procedure suma1(int a){
+	procedure suma2(int b){
+		b = b + 1;
+	}
+	a = a + 1;
+}
+main(){
+	int x = 3;
+	int y = 4;
+	x = suma1(x);
+	y = suma2(y);
+}

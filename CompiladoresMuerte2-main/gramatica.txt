@@ -1,0 +1,122 @@
+
+Decls -> Decl Decls                 
+    |Decl
+
+Decl -> Tipo List_ids P_coma
+    |subprograma 
+    |const Tipo Asignaciones
+    |Tipo Asignaciones 
+
+Tipo -> String
+    |Int
+    |Bool
+
+List_ids -> id 
+    |id Coma List_ids  
+                                  
+
+Asignaciones -> Asignacion P_coma       
+    |Asignacion Coma Asignaciones 
+                                               
+Asignacion -> List_ids Igual E 
+    
+    
+
+Operaciones -> Operacion
+    |Operaciones Operacion
+    
+
+Operacion -> Asignacion
+    |IF
+    |FOR
+    |WHILE
+    |SWITCH
+
+
+Sentencias ->Decls Sentencias
+    |Operaciones Sentencias
+    |Llamada_sub Sentencias
+    |Return
+    |lambda
+ 
+Llamada_sub -> id Parentesis_a List_ids Parentesis_c P_coma   
+
+FOR -> for Parentesis_a INIT P_coma COND P_coma OP Parentesis_c Llave_a  Sentencias Llave_c
+
+WHILE -> While Parentesis_a condiciones Parentesis_c Llave_a  Sentencias Llave_c
+
+IF -> if Parentesis_a condiciones Parentesis_c IfOpc
+
+IfOpc -> Llave_a   Sentencias Llave_c  Elseop
+
+Elseop -> lambda
+    |Else Llave_a  Sentencias Llave_c
+
+
+
+
+INIT -> Tipo Asignaciones 
+    |lambda
+
+
+COND -> condiciones
+    |lambda
+
+condiciones -> Parentesis_a condiciones Parentesis_c OpLog Parentesis_a condiciones Parentesis_c
+    |condicion  OpLog  condiciones 
+    |condicion OpLog Parentesis_a condiciones Parentesis_c
+    |condicion
+
+
+condicion -> id OpRel id 
+    |True
+    |False
+    |id
+
+OpLog -> and
+    |or
+
+OpRel -> Equal
+    |Not_equal
+    |Mayor
+    |Menor
+
+OP -> Asignacion
+ |lambda
+
+
+subprograma -> function Tipo id Parentesis_a Lista_Param Parentesis_c Llave_a Sentencias Llave_c
+    |procedure id Parentesis_a Lista_Param Parentesis_c Llave_a  Sentencias Llave_c
+
+Return -> return E P_coma
+    |return condicion P_coma
+
+
+Lista_Param -> Param Coma Lista_Param
+    |Param
+    
+
+Param -> Tipo id 
+
+
+E -> T EP
+
+EP -> Suma T EP
+    |Resta T EP
+    |lambda
+
+T -> F TP
+
+TP -> Mult F TP
+    |Div F TP
+    |lambda
+
+F -> Parentesis_a E Parentesis_c
+   |Entero
+   |Cadena
+   |-Entero
+   |id 
+
+
+
+  
